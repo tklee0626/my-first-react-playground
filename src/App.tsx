@@ -1,5 +1,5 @@
 import ProductGrid from './components/ProductGrid/ProductGrid';
-import { Product } from './components/ProductGrid/ProductGrid';
+import { Product } from './types/product';
 
 const sampleProducts: Product[] = [
   {

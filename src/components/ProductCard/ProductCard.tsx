@@ -1,17 +1,9 @@
 import Card from '../Card/Card';
 import Price from '../Price/Price';
 import Rating from '../Rating/Rating';
+import { Product } from '../../types/product';
 
-export interface ProductCardProps {
-  image: string;
-  brand: string;
-  productName: string;
-  price: number;
-  originalPrice?: number;
-  reviewCount?: number;
-  rating?: number;
-  freeShipping?: boolean;
-  freeShippingCondition?: string;
+export interface ProductCardProps extends Omit<Product, 'id'> {
   onClick?: () => void;
 }
 
