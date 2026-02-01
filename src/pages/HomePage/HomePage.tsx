@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
 import { Product } from '../../types/product';
+import { getProducts } from '../../services/productApi';
 
 const sampleProducts: Product[] = [
   {
@@ -60,9 +62,17 @@ const sampleProducts: Product[] = [
 ];
 
 function HomePage() {
+  const [dbProducts, setDbProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    getProducts().then(setDbProducts);
+  }, []);
+
+  const allProducts = [...sampleProducts, ...dbProducts];
+
   return (
     <div className="max-w-7xl mx-auto px-6">
-      <ProductGrid products={sampleProducts} />
+      <ProductGrid products={allProducts} />
     </div>
   );
 }
