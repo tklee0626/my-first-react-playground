@@ -28,3 +28,11 @@ export async function updateProduct(
   );
   return response.data;
 }
+
+export async function deleteProduct(id: number | string): Promise<void> {
+  await axios.delete(`${API_BASE_URL}/products/${id}`);
+}
+
+export async function reorderProducts(ids: (number | string)[]): Promise<void> {
+  await axios.put(`${API_BASE_URL}/products/reorder`, { ids });
+}

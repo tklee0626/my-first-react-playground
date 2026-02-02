@@ -9,4 +9,5 @@ export interface Product {
   rating?: number;
   freeShipping?: boolean;
   freeShippingCondition?: string;
+  sortOrder?: number;
 }

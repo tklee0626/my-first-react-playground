@@ -1,6 +1,106 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Product } from '../../types/product';
-import { getProducts, createProduct, updateProduct } from '../../services/productApi';
+import { getProducts, createProduct, updateProduct, deleteProduct, reorderProducts } from '../../services/productApi';
+
+function generateRandomColor(): string {
+  const hue = Math.floor(Math.random() * 360);
+  return `hsl(${hue}, 60%, 70%)`;
+}
+
+function Thumbnail({ src, alt }: { src: string; alt: string }) {
+  const [hasError, setHasError] = useState(false);
+  const fallbackColor = useMemo(() => generateRandomColor(), []);
+
+  if (hasError || !src) {
+    return (
+      <div
+        className="w-12 h-12 flex items-center justify-center rounded text-xs text-white"
+        style={{ backgroundColor: fallbackColor }}
+      >
+        {alt.slice(0, 2)}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-12 h-12 object-cover rounded"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
+interface SortableRowProps {
+  product: Product;
+  index: number;
+  onEdit: (product: Product) => void;
+  onDelete: (id: number | string) => void;
+}
+
+function SortableRow({ product, index, onEdit, onDelete }: SortableRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: product.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    backgroundColor: isDragging ? '#f3f4f6' : undefined,
+  };
+
+  return (
+    <tr ref={setNodeRef} style={style}>
+      <td className="border p-2 cursor-grab" {...attributes} {...listeners}>
+        ⠿ {index + 1}
+      </td>
+      <td className="border p-2">
+        <Thumbnail src={product.image} alt={product.productName} />
+      </td>
+      <td className="border p-2">{product.id}</td>
+      <td className="border p-2">{product.brand}</td>
+      <td className="border p-2">{product.productName}</td>
+      <td className="border p-2">{product.price.toLocaleString()}원</td>
+      <td className="border p-2">
+        <button
+          onClick={() => onEdit(product)}
+          className="text-blue-500 hover:underline"
+        >
+          수정
+        </button>
+        <button
+          onClick={() => onDelete(product.id)}
+          className="ml-2 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+        >
+          삭제
+        </button>
+      </td>
+    </tr>
+  );
+}
 
 function ProductAdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -16,6 +116,17 @@ function ProductAdminPage() {
     freeShipping: false,
     freeShippingCondition: '',
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     loadProducts();
@@ -80,6 +191,45 @@ function ProductAdminPage() {
       freeShipping: false,
       freeShippingCondition: '',
     });
+  }
+
+  async function handleDelete(id: number | string) {
+    if (!window.confirm('정말로 이 상품을 삭제하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      await deleteProduct(id);
+      alert('상품이 삭제되었습니다.');
+      loadProducts();
+    } catch (error) {
+      alert('상품 삭제에 실패했습니다.');
+      console.error(error);
+    }
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = products.findIndex((p) => p.id === active.id);
+      const newIndex = products.findIndex((p) => p.id === over.id);
+
+      const previousProducts = [...products];
+      const newProducts = [...products];
+      const [removed] = newProducts.splice(oldIndex, 1);
+      newProducts.splice(newIndex, 0, removed);
+
+      setProducts(newProducts);
+
+      try {
+        await reorderProducts(newProducts.map((p) => p.id));
+      } catch (error) {
+        setProducts(previousProducts);
+        alert('순서 저장에 실패했습니다.');
+        console.error(error);
+      }
+    }
   }
 
   return (
@@ -220,38 +370,42 @@ function ProductAdminPage() {
       </form>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4">상품 목록</h2>
-        <table className="w-full border-collapse border">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="border p-2 text-left">ID</th>
-              <th className="border p-2 text-left">브랜드</th>
-              <th className="border p-2 text-left">상품명</th>
-              <th className="border p-2 text-left">가격</th>
-              <th className="border p-2 text-left">액션</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((product) => (
-              <tr key={product.id}>
-                <td className="border p-2">{product.id}</td>
-                <td className="border p-2">{product.brand}</td>
-                <td className="border p-2">{product.productName}</td>
-                <td className="border p-2">
-                  {product.price.toLocaleString()}원
-                </td>
-                <td className="border p-2">
-                  <button
-                    onClick={() => handleEdit(product)}
-                    className="text-blue-500 hover:underline"
-                  >
-                    수정
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h2 className="text-lg font-semibold mb-4">상품 목록 (⠿ 드래그하여 순서 변경)</h2>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={products.map((p) => p.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <table className="w-full border-collapse border">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border p-2 text-left">순서</th>
+                  <th className="border p-2 text-left">이미지</th>
+                  <th className="border p-2 text-left">ID</th>
+                  <th className="border p-2 text-left">브랜드</th>
+                  <th className="border p-2 text-left">상품명</th>
+                  <th className="border p-2 text-left">가격</th>
+                  <th className="border p-2 text-left">액션</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product, index) => (
+                  <SortableRow
+                    key={product.id}
+                    product={product}
+                    index={index}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   );
