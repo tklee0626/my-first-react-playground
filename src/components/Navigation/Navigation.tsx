@@ -17,9 +17,6 @@ function Navigation() {
           <Link to="/" className={linkClass('/')}>
             홈
           </Link>
-          <Link to="/calculator" className={linkClass('/calculator')}>
-            계산기
-          </Link>
           <Link to="/admin/products" className={linkClass('/admin/products')}>
             상품 관리
           </Link>
